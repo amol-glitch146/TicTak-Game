@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Tic Tac Toe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .game-board {
+            aspect-ratio: 1/1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .cell {
+            background-color: #1a1a1a;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cell:hover {
+            transform: scale(0.98);
+            background-color: #2a2a2a;
+        }
+
+        .cell.x::before, .cell.x::after,
+        .cell.o::before {
+            content: '';
+            position: absolute;
+        }
+
+        .cell.x::before, .cell.x::after {
+            width: 12px;
+            height: 80%;
+            border-radius: 6px;
+            background-color: #ec4899;
+        }
+
+        .cell.x::before {
+            transform: rotate(45deg);
+        }
+
+        .cell.x::after {
+            transform: rotate(-45deg);
+        }
+
+        .cell.o::before {
+            width: 60%;
+            height: 60%;
+            border-radius: 50%;
+            border: 12px solid #22d3ee;
+        }
+
+        .winning-cell {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .tiktok-text {
+            background: linear-gradient(45deg, #FE2C55, #25F4EE);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        @media (max-width: 640px) {
+            .score-board {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .vs-text {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="py-4 px-6 border-b border-gray-800">
+        <h1 class="text-2xl font-bold text-pink-500 text-center">TikTok Tic Tac Toe</h1>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-4">
+        <div class="game-container w-full max-w-md">
+            <div class="score-board flex justify-between items-center mb-6">
+                <div class="player-score text-pink-500 text-xl">
+                    <span class="player-name">Player X</span>: <span id="score-x">0</span>
+                </div>
+                <div class="vs-text text-gray-400">VS</div>
+                <div class="player-score text-cyan-400 text-xl">
+                    <span class="player-name">Player O</span>: <span id="score-o">0</span>
+                </div>
+            </div>
+
+            <div class="game-board"></div>
+
+            <div class="controls flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="reset-game" class="bg-pink-600 hover:bg-pink-700 text-white py-2 px-4 rounded-lg transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Reset Game
+                </button>
+                <button id="reset-scores" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition">
+                    <i class="fas fa-trash-alt mr-2"></i>Reset Scores
+                </button>
+            </div>
+
+            <div id="winner-message" class="mt-6 text-center text-xl font-bold hidden"></div>
+        </div>
+    </main>
+
+    <footer class="py-4 px-6 border-t border-gray-800 text-center text-gray-500 text-sm">
+        © 2023 TikTok Tic Tac Toe | Made with ❤️ Amolratan 
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Game state
+            const state = {
+                board: ['', '', '', '', '', '', '', '', ''],
+                currentPlayer: 'x',
+                gameActive: true,
+                scores: {
+                    x: 0,
+                    o: 0
+                },
+                winningCombinations: [
+                    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+                    [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+                    [0, 4, 8], [2, 4, 6]             // diagonals
+                ]
+            };
+
+            // DOM elements
+            const gameBoard = document.querySelector('.game-board');
+            const scoreX = document.getElementById('score-x');
+            const scoreO = document.getElementById('score-o');
+            const resetGameBtn = document.getElementById('reset-game');
+            const resetScoresBtn = document.getElementById('reset-scores');
+            const winnerMessage = document.getElementById('winner-message');
+
+            // Initialize the game
+            function initGame() {
+                gameBoard.innerHTML = '';
+                state.board = ['', '', '', '', '', '', '', '', ''];
+                state.gameActive = true;
+                winnerMessage.classList.add('hidden');
+                
+                // Create cells
+                for (let i = 0; i < 9; i++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.setAttribute('data-index', i);
+                    cell.addEventListener('click', handleCellClick);
+                    gameBoard.appendChild(cell);
+                }
+            }
+
+            // Handle cell click
+            function handleCellClick(e) {
+                const index = e.target.getAttribute('data-index');
+                
+                // Check if cell is empty and game is active
+                if (state.board[index] !== '' || !state.gameActive) return;
+                
+                // Update board state
+                state.board[index] = state.currentPlayer;
+                e.target.classList.add(state.currentPlayer);
+                
+                // Check for win or draw
+                if (checkWin()) {
+                    endGame(false);
+                    return;
+                }
+                
+                if (checkDraw()) {
+                    endGame(true);
+                    return;
+                }
+                
+                // Switch player
+                state.currentPlayer = state.currentPlayer === 'x' ? 'o' : 'x';
+            }
+
+            // Check for win
+            function checkWin() {
+                return state.winningCombinations.some(combination => {
+                    const [a, b, c] = combination;
+                    return (
+                        state.board[a] !== '' && 
+                        state.board[a] === state.board[b] && 
+                        state.board[a] === state.board[c]
+                    );
+                });
+            }
+
+            // Check for draw
+            function checkDraw() {
+                return state.board.every(cell => cell !== '');
+            }
+
+            // End the game
+            function endGame(isDraw) {
+                state.gameActive = false;
+                
+                if (isDraw) {
+                    winnerMessage.textContent = "It's a Draw!";
+                    winnerMessage.classList.remove('hidden');
+                } else {
+                    // Update scores
+                    state.scores[state.currentPlayer]++;
+                    updateScores();
+                    
+                    // Show winner
+                    winnerMessage.textContent = `Player ${state.currentPlayer.toUpperCase()} Wins!`;
+                    winnerMessage.classList.remove('hidden');
+                    
+                    // Highlight winning cells
+                    highlightWinningCells();
+                }
+            }
+
+            // Highlight winning cells
+            function highlightWinningCells() {
+                const winningCombination = state.winningCombinations.find(combination => {
+                    const [a, b, c] = combination;
+                    return (
+                        state.board[a] !== '' && 
+                        state.board[a] === state.board[b] && 
+                        state.board[a] === state.board[c]
+                    );
+                });
+                
+                if (winningCombination) {
+                    winningCombination.forEach(index => {
+                        document.querySelector(`.cell[data-index="${index}"]`).classList.add('winning-cell');
+                    });
+                }
+            }
+
+            // Update score display
+            function updateScores() {
+                scoreX.textContent = state.scores.x;
+                scoreO.textContent = state.scores.o;
+            }
+
+            // Reset game (keep scores)
+            function resetGame() {
+                initGame();
+                state.currentPlayer = 'x';
+            }
+
+            // Reset scores
+            function resetScores() {
+                state.scores = { x: 0, o: 0 };
+                updateScores();
+                resetGame();
+            }
+
+            // Event listeners
+            resetGameBtn.addEventListener('click', resetGame);
+            resetScoresBtn.addEventListener('click', resetScores);
+
+            // Initialize the game
+            initGame();
+        });
+    </script>
+</body>
+</html>
